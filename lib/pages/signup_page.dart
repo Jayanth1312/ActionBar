@@ -150,12 +150,20 @@ class _SignupPageState extends State<SignupPage> {
                       // Full name with validation
                       CustomTextField(
                         controller: _nameController,
-                        labelText: 'Full Name',
+                        labelText: 'User Name',
                         errorText: _nameError,
                         isValid: _isNameValid,
-                        suffixIcon: const FaIcon(
-                          FontAwesomeIcons.user,
-                          size: 18,
+                        suffixIcon: Container(
+                          width: 40,
+                          alignment: Alignment.centerRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 12.0),
+                            child: FaIcon(
+                              FontAwesomeIcons.user,
+                              size: 18,
+                              color: Colors.grey[800],
+                            ),
+                          ),
                         ),
                         onChanged: _validateName,
                       ),
@@ -166,13 +174,21 @@ class _SignupPageState extends State<SignupPage> {
                         labelText: 'Email',
                         errorText: _emailError,
                         isValid: _isEmailValid,
-                        suffixIcon: const FaIcon(
-                          FontAwesomeIcons.solidEnvelope,
-                          size: 18,
+                        suffixIcon: Container(
+                          width: 40,
+                          alignment: Alignment.centerRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 12.0),
+                            child: FaIcon(
+                              FontAwesomeIcons.solidEnvelope,
+                              size: 18,
+                              color: Colors.grey[800],
+                            ),
+                          ),
                         ),
                         onChanged: _validateEmail,
                       ),
-
+                      
                       // Password with validation
                       CustomTextField(
                         controller: _passwordController,

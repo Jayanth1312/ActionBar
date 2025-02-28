@@ -132,9 +132,17 @@ class _LoginPageState extends State<LoginPage> {
                         labelText: 'Email',
                         errorText: _emailError,
                         isValid: _isEmailValid,
-                        suffixIcon: const FaIcon(
-                          FontAwesomeIcons.solidEnvelope,
-                          size: 18,
+                        suffixIcon: Container(
+                          width: 40,
+                          alignment: Alignment.centerRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 12.0),
+                            child: FaIcon(
+                              FontAwesomeIcons.solidEnvelope,
+                              size: 18,
+                              color: Colors.grey[800],
+                            ),
+                          ),
                         ),
                         onChanged: _validateEmail,
                       ),
