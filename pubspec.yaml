@@ -19,7 +19,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.0
+  sdk: ">=3.0.0 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -37,6 +37,10 @@ dependencies:
   flutter_svg: ^2.0.9
   # Add this package
   font_awesome_flutter: ^10.5.0
+  android_intent_plus: ^5.3.0
+  flutter_local_notifications: ^18.0.1
+  provider: ^6.0.5
+  url_launcher: ^6.1.11
 
 dev_dependencies:
   flutter_test:
@@ -77,13 +81,13 @@ flutter:
   # list giving the asset and other descriptors for the font. For
   # example:
   fonts:
-    - family: DMSans
+    - family: Inter
       fonts:
-        - asset: lib/assets/fonts/DMSans-Regular.ttf
+        - asset: lib/assets/fonts/Inter-Regular.ttf
           weight: 400
-        - asset: lib/assets/fonts/DMSans-Medium.ttf
+        - asset: lib/assets/fonts/Inter-Medium.ttf
           weight: 500
-        - asset: lib/assets/fonts/DMSans-Bold.ttf
+        - asset: lib/assets/fonts/Inter-Bold.ttf
           weight: 700
   #       - asset: fonts/Schyler-Italic.ttf
   #         style: italic
