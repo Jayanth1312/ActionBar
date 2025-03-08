@@ -27,7 +27,7 @@ class AppTheme extends ChangeNotifier {
         ),
       );
 
-  // Define dark theme
+  // Dark theme
   ThemeData get darkTheme => ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF1E1E1E),

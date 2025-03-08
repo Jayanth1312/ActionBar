@@ -209,6 +209,11 @@ class _HomePageState extends State<HomePage> {
         theme.inputDecorationTheme.hintStyle?.color ?? Colors.grey;
     final textColor = theme.textTheme.bodyMedium?.color ?? Colors.white;
 
+    final suggestionBorderColor = textFieldBgColor;
+    final suggestionTextColor = hintColor;
+    final suggestionBgColor =
+        textFieldBgColor.withOpacity(0.5);
+
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
@@ -278,9 +283,9 @@ class _HomePageState extends State<HomePage> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12.0, vertical: 0),
                         decoration: BoxDecoration(
-                          color: Colors.transparent,
+                          color: suggestionBgColor,
                           border: Border.all(
-                            color: const Color(0xFF333333),
+                            color: suggestionBorderColor,
                             width: 1.0,
                           ),
                           borderRadius: BorderRadius.circular(12.0),
@@ -288,11 +293,16 @@ class _HomePageState extends State<HomePage> {
                         child: Center(
                           child: Text(
                             _suggestions[index].displayText,
-                            style: const TextStyle(
-                              color: Colors.white60,
-                              fontSize: 14,
-                              fontFamily: 'Inter',
-                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                  color: suggestionTextColor,
+                                  fontSize: 14,
+                                  fontFamily: 'Inter',
+                                ) ??
+                                TextStyle(
+                                  color: suggestionTextColor,
+                                  fontSize: 14,
+                                  fontFamily: 'Inter',
+                                ),
                           ),
                         ),
                       ),
@@ -335,7 +345,8 @@ class _HomePageState extends State<HomePage> {
                         fontSize: 16,
                       ),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12.0),
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 12.0),
                     ),
                     onSubmitted: _handleSubmitted,
                   ),
