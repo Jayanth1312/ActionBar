@@ -9,12 +9,20 @@ import android.content.Intent
 import android.provider.AlarmClock
 import android.content.ComponentName
 import android.util.Log
+import android.os.Bundle
 
 class MainActivity : FlutterActivity() {
     companion object {
         private const val ALARM_CHANNEL = "com.example.actionbar/alarm"
         private const val TIMER_CHANNEL = "com.example.actionbar/timer"
         private const val TAG = "MainActivity"
+    }
+
+    // Add this method to remove the splash screen
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Remove the splash screen when creating the activity
+        setTheme(R.style.LaunchTheme)
+        super.onCreate(savedInstanceState)
     }
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {

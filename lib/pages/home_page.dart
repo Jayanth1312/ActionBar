@@ -107,7 +107,7 @@ class _HomePageState extends State<HomePage> {
       _performWebSearch(text.substring(1).trim());
       actionMessage = 'Searching web...';
     }
-    //Weather search
+    //Weather
     else if (text.toLowerCase().startsWith('weather in ') && text.length > 11) {
       _getWeather(text.substring(11).trim());
       actionMessage = 'Fetching weather...';
@@ -303,7 +303,7 @@ class _HomePageState extends State<HomePage> {
             ),
 
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 0),
               child: Container(
                 decoration: BoxDecoration(
                   color: textFieldBgColor,
