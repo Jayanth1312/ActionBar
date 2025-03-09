@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 class TimerUtils {
-  static const MethodChannel _channel =
-      MethodChannel('com.example.actionbar/timer');
+  // Change the channel name to match MainActivity.kt
+  static const platform = MethodChannel('com.example.actionbar/timer');
 
   static final Map<String, String> _clockPackages = {
     'oneplus': 'com.oneplus.deskclock',
@@ -15,62 +15,64 @@ class TimerUtils {
     'huawei': 'com.android.deskclock',
   };
 
-  static Future<bool> createTimer(String command) async {
-    if (!command.startsWith('@t ')) {
-      return false;
-    }
-
+  static Future<bool> createTimer(String input) async {
     try {
-      final timeString = command.substring(3).trim();
+      // Parse the input format '@t 5min' or '@t 1hr 30min'
+      final timeString = input.substring(3).trim().toLowerCase();
 
-      int totalSeconds = 0;
+      int minutes = 0;
 
-      if (timeString.contains('hr') && timeString.contains('min')) {
-        final hourPart = timeString.split('hr')[0].trim();
-        final hourValue = int.parse(hourPart);
+      if (timeString.contains('hr')) {
+        final parts = timeString.split('hr');
+        final hours = int.tryParse(parts[0].trim()) ?? 0;
+        minutes += hours * 60;
 
-        final minPart = timeString.split('hr')[1].split('min')[0].trim();
-        final minValue = int.parse(minPart);
-
-        totalSeconds = (hourValue * 3600) + (minValue * 60);
-      } else if (timeString.contains('hr')) {
-        final hourValue = int.parse(timeString.split('hr')[0].trim());
-        totalSeconds = hourValue * 3600;
+        if (parts.length > 1 && parts[1].contains('min')) {
+          final minPart = parts[1].trim().split('min')[0].trim();
+          final mins = int.tryParse(minPart) ?? 0;
+          minutes += mins;
+        }
       } else if (timeString.contains('min')) {
-        final minValue = int.parse(timeString.split('min')[0].trim());
-        totalSeconds = minValue * 60;
+        final minPart = timeString.split('min')[0].trim();
+        minutes = int.tryParse(minPart) ?? 0;
       } else {
-        totalSeconds = int.parse(timeString) * 60;
+        // Try to parse as just minutes
+        minutes = int.tryParse(timeString) ?? 0;
       }
 
-      if (totalSeconds <= 0) {
+      if (minutes <= 0) {
         return false;
       }
 
       if (Platform.isAndroid) {
-        return await _launchAndroidTimer(totalSeconds);
-      } else {
-        return await _channel.invokeMethod('createTimer', {
-          'seconds': totalSeconds,
-        });
+        return await _launchAndroidTimer(minutes * 60);
       }
+
+      // Call native method
+      final result = await platform.invokeMethod('createTimer', {
+        'minutes': minutes,
+      });
+
+      return result == true;
     } catch (e) {
       print('Error creating timer: $e');
       return false;
     }
   }
 
+  /// Show a notification for the timer instead of opening the clock app
   static Future<bool> _launchAndroidTimer(int seconds) async {
     try {
+      // Get the appropriate package name based on device manufacturer
       final packageName =
           _clockPackages['oneplus'] ?? _clockPackages['default'];
 
-      return await _channel.invokeMethod('launchAndroidTimer', {
-        'packageName': packageName,
+      return await platform.invokeMethod('launchAndroidTimer', {
         'seconds': seconds,
+        'packageName': packageName, // Add the missing packageName parameter
       });
     } catch (e) {
-      print('Error launching Android timer: $e');
+      print('Error showing timer notification: $e');
       return false;
     }
   }
@@ -80,11 +82,11 @@ class TimerUtils {
       if (Platform.isAndroid) {
         final packageName =
             _clockPackages['oneplus'] ?? _clockPackages['default'];
-        return await _channel.invokeMethod('showAndroidTimers', {
+        return await platform.invokeMethod('showAndroidTimers', {
           'packageName': packageName,
         });
       } else {
-        return await _channel.invokeMethod('showTimers');
+        return await platform.invokeMethod('showTimers');
       }
     } catch (e) {
       print('Error showing timers: $e');

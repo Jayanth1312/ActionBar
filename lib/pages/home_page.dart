@@ -12,12 +12,14 @@ class SuggestionItem {
   final String textToInsert;
   final int highlightStartIndex;
   final int highlightEndIndex;
+  final IconData? icon;
 
   SuggestionItem({
     required this.displayText,
     required this.textToInsert,
     required this.highlightStartIndex,
     required this.highlightEndIndex,
+    this.icon,
   });
 }
 
@@ -32,43 +34,61 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final TextEditingController _controller = TextEditingController();
   WeatherData? _weatherData;
-  bool _isLoading = false;
+  // bool _isWeatherLoading = false;
   String? _errorMessage;
   String? _actionMessage;
 
   // Suggestions
   final List<SuggestionItem> _suggestions = [
     SuggestionItem(
-      displayText: 'weather in new york',
+      displayText: 'Weather',
       textToInsert: 'weather in new york',
       highlightStartIndex: 11,
       highlightEndIndex: 19,
+      icon: Icons.cloud,
     ),
     SuggestionItem(
-      displayText: '@m mailid subject',
+      displayText: 'Mail',
       textToInsert: '@m mailid subject',
       highlightStartIndex: 3,
       highlightEndIndex: 9,
+      icon: Icons.email,
     ),
     SuggestionItem(
-      displayText: '@who is taylor swift',
+      displayText: 'Google search',
       textToInsert: '@who is taylor swift',
       highlightStartIndex: 1,
       highlightEndIndex: 20,
+      icon: Icons.language,
     ),
     SuggestionItem(
-      displayText: '@a 8 00 am',
+      displayText: 'YouTube',
+      textToInsert: '@yt funny cat videos',
+      highlightStartIndex: 4,
+      highlightEndIndex: 20,
+      icon: Icons.video_library,
+    ),
+    SuggestionItem(
+      displayText: 'Alarm',
       textToInsert: '@a 8 00 am',
       highlightStartIndex: 3,
       highlightEndIndex: 10,
+      icon: Icons.alarm,
     ),
     SuggestionItem(
-      displayText: '@t 10min',
+      displayText: 'Timer',
       textToInsert: '@t 10min',
       highlightStartIndex: 3,
       highlightEndIndex: 8,
+      icon: Icons.timer,
     ),
   ];
+
+  void _showError(String message) {
+    setState(() {
+      _errorMessage = message;
+    });
+  }
 
   void _handleSubmitted(String text) async {
     setState(() {
@@ -81,43 +101,44 @@ class _HomePageState extends State<HomePage> {
     //Email
     if (text.startsWith('@m ')) {
       ActionUtils.sendEmail(text.substring(3).trim());
-      actionMessage = 'Composing email...';
     }
-    //Alarm command
+    //Alarm
     else if (text.startsWith('@a ')) {
       final success = await AlarmUtils.createAlarm(text);
       if (success) {
-        actionMessage = 'Opening alarm settings...';
+        actionMessage = 'Alarm set successfully!';
       } else {
         _showError('Could not set alarm. Use format: @a 5 30 am or @a 17 45');
       }
     }
-    //Timer command
+    //Timer
     else if (text.startsWith('@t ')) {
       final success = await TimerUtils.createTimer(text);
       if (success) {
-        actionMessage = 'Opening timer...';
+        actionMessage = 'Timer set successfully!';
       } else {
         _showError(
             'Could not start timer. Use format: @t 5min or @t 1hr 30min');
       }
     }
+    //YouTube search
+    else if (text.startsWith('@yt ') && text.length > 4) {
+      await ActionUtils.searchYouTube(text.substring(4).trim());
+      actionMessage = 'Searching YouTube...';
+    }
     //Google search
     else if (text.startsWith('@') && text.length > 1) {
       _performWebSearch(text.substring(1).trim());
-      actionMessage = 'Searching web...';
     }
     //Weather
     else if (text.toLowerCase().startsWith('weather in ') && text.length > 11) {
       _getWeather(text.substring(11).trim());
-      actionMessage = 'Fetching weather...';
     }
     //Web search
     else if (text.startsWith('www') ||
         text.startsWith('http://') ||
         text.startsWith('https://')) {
       _performWebSearch(text);
-      actionMessage = 'Opening website...';
     }
 
     // Toast message
@@ -156,14 +177,16 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _getWeather(String city) async {
     setState(() {
-      _isLoading = true;
+      // _isWeatherLoading = true;
+      _actionMessage = 'Fetching weather for "$city"...';
     });
 
     final weatherData = await WeatherService.getWeather(city);
 
     setState(() {
       _weatherData = weatherData;
-      _isLoading = false;
+      // _isWeatherLoading = false;
+      _actionMessage = null;
     });
 
     if (weatherData == null && mounted) {
@@ -178,17 +201,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _performWebSearch(String query) async {
-    final success = await WebSearch.performWebSearch(query);
-
-    if (!success && mounted) {
-      _showError('Could not launch search. Is a browser installed?');
-    }
-  }
-
-  void _showError(String message) {
-    setState(() {
-      _errorMessage = message;
-    });
+    await WebSearch.performWebSearch(query);
   }
 
   @override
@@ -210,9 +223,8 @@ class _HomePageState extends State<HomePage> {
     final textColor = theme.textTheme.bodyMedium?.color ?? Colors.white;
 
     final suggestionBorderColor = textFieldBgColor;
-    final suggestionTextColor = hintColor;
-    final suggestionBgColor =
-        textFieldBgColor.withOpacity(0.5);
+    final suggestionTextColor = Colors.grey;
+    final suggestionBgColor = textFieldBgColor.withOpacity(0.5);
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -253,9 +265,7 @@ class _HomePageState extends State<HomePage> {
 
             const Spacer(),
 
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator())
-            else if (_weatherData != null)
+            if (_weatherData != null)
               Align(
                 alignment: Alignment.topLeft,
                 child: WeatherDisplay(
@@ -290,20 +300,32 @@ class _HomePageState extends State<HomePage> {
                           ),
                           borderRadius: BorderRadius.circular(12.0),
                         ),
-                        child: Center(
-                          child: Text(
-                            _suggestions[index].displayText,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                  color: suggestionTextColor,
-                                  fontSize: 14,
-                                  fontFamily: 'Inter',
-                                ) ??
-                                TextStyle(
-                                  color: suggestionTextColor,
-                                  fontSize: 14,
-                                  fontFamily: 'Inter',
-                                ),
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_suggestions[index].icon != null)
+                              Icon(
+                                _suggestions[index].icon,
+                                color: suggestionTextColor,
+                                size: 16,
+                              ),
+                            SizedBox(
+                                width:
+                                    _suggestions[index].icon != null ? 6.0 : 0),
+                            Text(
+                              _suggestions[index].displayText,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                    color: suggestionTextColor,
+                                    fontSize: 14,
+                                    fontFamily: 'Inter',
+                                  ) ??
+                                  TextStyle(
+                                    color: suggestionTextColor,
+                                    fontSize: 14,
+                                    fontFamily: 'Inter',
+                                  ),
+                            ),
+                          ],
                         ),
                       ),
                     );

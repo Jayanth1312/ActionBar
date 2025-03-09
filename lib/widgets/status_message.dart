@@ -42,6 +42,8 @@ class StatusMessage extends StatelessWidget {
                   message,
                   style: const TextStyle(color: Colors.white),
                   textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 3,
                 ),
               ),
               if (onDismiss != null)

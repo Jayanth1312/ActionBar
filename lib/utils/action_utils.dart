@@ -28,4 +28,13 @@ class ActionUtils {
       print("Error opening mail app: $e");
     }
   }
+
+  static Future<void> searchYouTube(String query) async {
+    final encodedQuery = Uri.encodeComponent(query);
+    final url = 'https://www.youtube.com/results?search_query=$encodedQuery';
+
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
+  }
 }

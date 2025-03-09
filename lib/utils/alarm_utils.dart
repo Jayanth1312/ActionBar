@@ -5,7 +5,6 @@ class AlarmUtils {
   static const MethodChannel _channel =
       MethodChannel('com.example.actionbar/alarm');
 
-  /// Package names for different device manufacturers
   static final Map<String, String> _clockPackages = {
     'oneplus': 'com.oneplus.deskclock',
     'default': 'com.android.deskclock',
@@ -16,81 +15,66 @@ class AlarmUtils {
     'huawei': 'com.android.deskclock',
   };
 
-  /// Creates an alarm based on a command string
-  /// Format: "@a 5 30 am" or "@a 17 45" (24-hour format)
-  static Future<bool> createAlarm(String command) async {
-    if (!command.startsWith('@a ')) {
-      return false;
-    }
-
+  static Future<bool> createAlarm(String input) async {
     try {
-      // Remove the @a prefix and trim
-      final timeString = command.substring(3).trim();
+      // Parse the input format '@a 8 30 am' or '@a 17 45'
+      final parts = input.substring(3).trim().split(' ');
 
-      // Parse the time components
-      final components = timeString.split(' ');
+      if (parts.length < 1) return false;
 
       int hour;
-      int minute;
-      bool isPM = false;
+      int minute = 0;
+      bool isAM = false;
 
-      // Handle different formats
-      if (components.length >= 3 &&
-          (components[2].toLowerCase() == 'am' ||
-              components[2].toLowerCase() == 'pm')) {
-        // Format: "@a 5 30 am" or "@a 5 30 pm"
-        hour = int.parse(components[0]);
-        minute = int.parse(components[1]);
-        isPM = components[2].toLowerCase() == 'pm';
+      // Check for AM/PM format
+      if (parts.length >= 3 &&
+          (parts[2].toLowerCase() == 'am' || parts[2].toLowerCase() == 'pm')) {
+        hour = int.tryParse(parts[0]) ?? -1;
+        minute = int.tryParse(parts[1]) ?? 0;
+        isAM = parts[2].toLowerCase() == 'am';
 
-        // Convert 12-hour to 24-hour if needed
-        if (isPM && hour < 12) {
+        if (hour == -1) return false;
+
+        // Convert to 24-hour format
+        if (!isAM && hour < 12) {
           hour += 12;
-        } else if (!isPM && hour == 12) {
+        } else if (isAM && hour == 12) {
           hour = 0;
         }
-      } else if (components.length >= 2) {
-        // Format: "@a 17 45" (24-hour format)
-        hour = int.parse(components[0]);
-        minute = int.parse(components[1]);
       } else {
-        return false;
+        // 24-hour format
+        hour = int.tryParse(parts[0]) ?? -1;
+        if (parts.length >= 2) {
+          minute = int.tryParse(parts[1]) ?? 0;
+        }
+
+        if (hour == -1) return false;
       }
 
-      // Validate time values
+      // Validate time
       if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
         return false;
       }
 
-      if (Platform.isAndroid) {
-        return await _launchAndroidAlarm(hour, minute);
-      } else {
-        // For iOS or other platforms
-        return await _channel.invokeMethod('createAlarm', {
-          'hour': hour,
-          'minute': minute,
-        });
-      }
+      // Call native method to create and show the alarm
+      final result = await _launchAndroidAlarm(hour, minute);
+
+      return result;
     } catch (e) {
       print('Error creating alarm: $e');
       return false;
     }
   }
 
-  /// Launch the Android alarm intent
+  /// Show a notification for the alarm instead of opening the clock app
   static Future<bool> _launchAndroidAlarm(int hour, int minute) async {
     try {
-      // Get the appropriate clock package - you can make this configurable
-      final packageName =
-          _clockPackages['oneplus'] ?? _clockPackages['default'];
-
       return await _channel.invokeMethod('launchAndroidAlarm', {
-        'packageName': packageName,
         'hour': hour,
         'minute': minute,
       });
     } catch (e) {
-      print('Error launching Android alarm: $e');
+      print('Error showing alarm notification: $e');
       return false;
     }
   }

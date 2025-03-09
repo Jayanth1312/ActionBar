@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class WeatherData {
   final String city;
@@ -32,9 +33,15 @@ class WeatherData {
 }
 
 class WeatherService {
-  static const String _apiKey = 'a92b9a7a7b1e614f1e99ae19c7e92ae3';
+  static String get _apiKey {
+    final apiKey = dotenv.env['OPENWEATHER_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      print('WARNING: OpenWeather API key is missing or empty');
+      return '';
+    }
+    return apiKey;
+  }
 
-  // Helper to convert wind degrees to direction
   static String _getWindDirection(int degrees) {
     const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     return directions[(degrees ~/ 45) % 8];
@@ -42,21 +49,25 @@ class WeatherService {
 
   static Future<WeatherData?> getWeather(String city) async {
     try {
-      // Get main weather data
+      if (_apiKey.isEmpty) {
+        print('Error: API key is empty. Cannot fetch weather data.');
+        return null;
+      }
+
       final url =
           'https://api.openweathermap.org/data/2.5/weather?q=$city&units=metric&appid=$_apiKey';
+
+      print(
+          'Fetching weather data from: ${url.replaceAll(_apiKey, 'API_KEY')}');
 
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Get wind direction from degrees
         final windDegrees = data['wind']['deg'] ?? 0;
         final windDirection = _getWindDirection(windDegrees);
 
-        // Get UV Index data using OpenWeatherMap's OneCall API
-        // Note: This requires coordinates from our first request
         int uvIndex = 0;
 
         try {
@@ -69,16 +80,14 @@ class WeatherService {
 
           if (uvResponse.statusCode == 200) {
             final uvData = jsonDecode(uvResponse.body);
-            // The UV index is available in current.uvi
             if (uvData['current'] != null && uvData['current']['uvi'] != null) {
               uvIndex = uvData['current']['uvi'].round();
             }
           }
         } catch (e) {
           print('Error fetching UV data: $e');
-          // Fallback to estimated UV Index if something goes wrong
+
           if (data['clouds'] != null && data['clouds']['all'] != null) {
-            // Lower cloud coverage = higher UV
             final cloudCoverage = data['clouds']['all'];
             uvIndex = (11 * (1 - cloudCoverage / 100)).round();
           }
@@ -99,8 +108,10 @@ class WeatherService {
           uvIndex: uvIndex,
           visibility: data['visibility'] / 1000,
         );
+      } else {
+        print('Error response: ${response.statusCode}, ${response.body}');
+        return null;
       }
-      return null;
     } catch (e) {
       print('Error fetching weather data: $e');
       return null;

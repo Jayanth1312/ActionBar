@@ -55,15 +55,34 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "launchAndroidTimer" -> {
-                        val timerPackageName = call.argument<String>("packageName")
-                        val seconds = call.argument<Int>("seconds") ?: 0
-                        val timerResult = launchAndroidTimer(timerPackageName, seconds)
-                        result.success(timerResult)
+                        try {
+                            val timerPackageName = call.argument<String>("packageName")
+                            val seconds = call.argument<Int>("seconds") ?: 0
+
+                            Log.d(TAG, "Starting timer for $seconds seconds with package: $timerPackageName")
+
+                            if (seconds <= 0) {
+                                Log.e(TAG, "Invalid timer duration: $seconds seconds")
+                                result.error("INVALID_DURATION", "Timer duration must be greater than 0", null)
+                                return@setMethodCallHandler
+                            }
+
+                            val timerResult = launchAndroidTimer(timerPackageName, seconds)
+                            result.success(timerResult)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in launchAndroidTimer: ${e.message}")
+                            result.error("TIMER_ERROR", "Could not start timer. Use format: minutes or hours/minutes", e.message)
+                        }
                     }
                     "showAndroidTimers" -> {
-                        val showTimersPackage = call.argument<String>("packageName")
-                        val showTimersResult = showAndroidTimers(showTimersPackage)
-                        result.success(showTimersResult)
+                        try {
+                            val showTimersPackage = call.argument<String>("packageName")
+                            val showTimersResult = showAndroidTimers(showTimersPackage)
+                            result.success(showTimersResult)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in showAndroidTimers: ${e.message}")
+                            result.error("TIMER_ERROR", "Could not show timers", e.message)
+                        }
                     }
                     else -> {
                         result.notImplemented()
@@ -130,6 +149,7 @@ class MainActivity : FlutterActivity() {
 
     private fun launchAndroidTimer(packageName: String?, seconds: Int): Boolean {
         return try {
+            Log.d(TAG, "Attempting to launch timer with ACTION_SET_TIMER")
             val intent = Intent(AlarmClock.ACTION_SET_TIMER).apply {
                 putExtra(AlarmClock.EXTRA_LENGTH, seconds)
                 putExtra(AlarmClock.EXTRA_MESSAGE, "Timer set from ActionBar")
@@ -137,23 +157,29 @@ class MainActivity : FlutterActivity() {
 
                 if (!packageName.isNullOrEmpty()) {
                     setPackage(packageName)
+                    Log.d(TAG, "Setting package to: $packageName")
                 }
             }
 
             startActivity(intent)
+            Log.d(TAG, "Timer intent started successfully")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error launching timer intent: ${e.message}")
+            Log.e(TAG, "Error launching timer intent: ${e.message}", e)
 
             // Fallback to just opening the clock app
             try {
+                Log.d(TAG, "Attempting fallback to launch clock app")
                 val launchIntent = packageName?.let { packageManager.getLaunchIntentForPackage(it) }
                 if (launchIntent != null) {
                     startActivity(launchIntent)
+                    Log.d(TAG, "Fallback successful - opened clock app")
                     return true
+                } else {
+                    Log.e(TAG, "No launch intent found for package: $packageName")
                 }
             } catch (ex: Exception) {
-                Log.e(TAG, "Fallback failed: ${ex.message}")
+                Log.e(TAG, "Fallback failed: ${ex.message}", ex)
             }
 
             false

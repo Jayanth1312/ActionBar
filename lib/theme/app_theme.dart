@@ -30,14 +30,14 @@ class AppTheme extends ChangeNotifier {
   // Dark theme
   ThemeData get darkTheme => ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF1E1E1E),
+        scaffoldBackgroundColor: const Color(0xFF121212),
         appBarTheme: const AppBarTheme(
           titleTextStyle: TextStyle(color: Colors.white, fontSize: 20),
           elevation: 0,
         ),
         inputDecorationTheme: InputDecorationTheme(
-          fillColor: Colors.grey[850],
-          hintStyle: const TextStyle(color: Colors.grey),
+          fillColor: const Color(0xFF262626),
+          hintStyle: const TextStyle(color: Color(0xFFD4D4D4)),
         ),
         textTheme: const TextTheme(
           bodyMedium: TextStyle(color: Colors.white),
