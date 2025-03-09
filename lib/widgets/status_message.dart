@@ -23,7 +23,7 @@ class StatusMessage extends StatelessWidget {
           margin: const EdgeInsets.all(8.0),
           decoration: BoxDecoration(
             color: Colors.grey[800],
-            borderRadius: BorderRadius.circular(8.0),
+            borderRadius: BorderRadius.circular(12.0),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
