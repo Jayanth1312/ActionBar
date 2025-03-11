@@ -56,7 +56,6 @@ class AlarmUtils {
         return false;
       }
 
-      // Call native method to create and show the alarm
       final result = await _launchAndroidAlarm(hour, minute);
 
       return result;
@@ -66,7 +65,6 @@ class AlarmUtils {
     }
   }
 
-  /// Show a notification for the alarm instead of opening the clock app
   static Future<bool> _launchAndroidAlarm(int hour, int minute) async {
     try {
       return await _channel.invokeMethod('launchAndroidAlarm', {

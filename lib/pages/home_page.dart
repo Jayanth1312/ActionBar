@@ -6,6 +6,9 @@ import '../utils/alarm_utils.dart';
 import '../utils/timer_utils.dart';
 import '../widgets/weather_display.dart';
 import '../widgets/status_message.dart';
+import '../utils/web_scraper_service.dart';
+import '../utils/gemini_service.dart';
+import 'package:flutter/services.dart';
 
 class SuggestionItem {
   final String displayText;
@@ -34,18 +37,32 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final TextEditingController _controller = TextEditingController();
   WeatherData? _weatherData;
-  // bool _isWeatherLoading = false;
+  List<WebScrapingResult>? _webResults;
   String? _errorMessage;
   String? _actionMessage;
 
   // Suggestions
   final List<SuggestionItem> _suggestions = [
     SuggestionItem(
+      displayText: 'Web Results',
+      textToInsert: '@w flutter development',
+      highlightStartIndex: 3,
+      highlightEndIndex: 22,
+      icon: Icons.web,
+    ),
+    SuggestionItem(
       displayText: 'Weather',
       textToInsert: 'weather in new york',
       highlightStartIndex: 11,
       highlightEndIndex: 19,
       icon: Icons.cloud,
+    ),
+    SuggestionItem(
+      displayText: 'New note',
+      textToInsert: '@n title',
+      highlightStartIndex: 3,
+      highlightEndIndex: 7,
+      icon: Icons.description,
     ),
     SuggestionItem(
       displayText: 'Mail',
@@ -98,25 +115,51 @@ class _HomePageState extends State<HomePage> {
 
     String? actionMessage;
 
+    //Web Results
+    if (text.startsWith('@w ') && text.length > 3) {
+      await _handleWebScraping(text.substring(3).trim());
+    }
+    //Notes
+    else if (text.startsWith('@n ') && text.length > 3) {
+      final title = text.substring(3).trim();
+
+      setState(() {
+        _actionMessage = 'Creating note...';
+      });
+
+      final success = await ActionUtils.createNote(title, "");
+
+      if (success) {
+        setState(() {
+          _actionMessage = 'Note created: "$title"';
+        });
+
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            setState(() {
+              _actionMessage = null;
+            });
+          }
+        });
+      } else {
+        _showError('Could not create note. Notes app not available.');
+      }
+    }
     //Email
-    if (text.startsWith('@m ')) {
+    else if (text.startsWith('@m ')) {
       ActionUtils.sendEmail(text.substring(3).trim());
     }
     //Alarm
     else if (text.startsWith('@a ')) {
       final success = await AlarmUtils.createAlarm(text);
-      if (success) {
-        actionMessage = 'Alarm set successfully!';
-      } else {
+      if (!success) {
         _showError('Could not set alarm. Use format: @a 5 30 am or @a 17 45');
       }
     }
     //Timer
     else if (text.startsWith('@t ')) {
       final success = await TimerUtils.createTimer(text);
-      if (success) {
-        actionMessage = 'Timer set successfully!';
-      } else {
+      if (!success) {
         _showError(
             'Could not start timer. Use format: @t 5min or @t 1hr 30min');
       }
@@ -177,7 +220,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _getWeather(String city) async {
     setState(() {
-      // _isWeatherLoading = true;
       _actionMessage = 'Fetching weather for "$city"...';
     });
 
@@ -185,7 +227,6 @@ class _HomePageState extends State<HomePage> {
 
     setState(() {
       _weatherData = weatherData;
-      // _isWeatherLoading = false;
       _actionMessage = null;
     });
 
@@ -203,6 +244,45 @@ class _HomePageState extends State<HomePage> {
   Future<void> _performWebSearch(String query) async {
     await WebSearch.performWebSearch(query);
   }
+
+  Future<void> _handleWebScraping(String query) async {
+    setState(() {
+      _actionMessage = 'Fetching web results...';
+      _webResults = null;
+    });
+
+    try {
+      final results = await WebScraperService.scrapeTopResults(query);
+
+      final descriptions = results.map((r) => r.description).toList();
+      final summary = await GeminiService.getSummary(descriptions);
+
+      final summarizedResults = results
+          .map((r) => WebScrapingResult(
+                title: r.title,
+                description: summary,
+                url: r.url,
+                faviconUrl: r.faviconUrl,
+              ))
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _webResults = summarizedResults;
+          _actionMessage = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Failed to fetch web results: ${e.toString()}');
+        setState(() {
+          _actionMessage = null;
+        });
+      }
+    }
+  }
+
+  bool _showDetailedResults = false;
 
   @override
   void dispose() {
@@ -245,138 +325,433 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         backgroundColor: backgroundColor,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 4.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_errorMessage != null)
-              StatusMessage(
-                message: _errorMessage!,
-                type: MessageType.error,
-                onDismiss: () => setState(() => _errorMessage = null),
-              ),
-            if (_actionMessage != null)
-              StatusMessage(
-                message: _actionMessage!,
-                type: MessageType.acknowledgement,
-              ),
-
-            const Spacer(),
-
-            if (_weatherData != null)
-              Align(
-                alignment: Alignment.topLeft,
-                child: WeatherDisplay(
-                  weatherData: _weatherData!,
-                  onClose: _clearResults,
-                ),
-              ),
-
-            // Suggestion list
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8.0, 0, 0, 0),
-              child: Container(
-                height: 40,
-                margin: const EdgeInsets.only(bottom: 10.0),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _suggestions.length,
-                  itemBuilder: (context, index) {
-                    return GestureDetector(
-                      onTap: () =>
-                          _applyHighlightedSuggestion(_suggestions[index]),
-                      child: Container(
-                        height: 40,
-                        margin: const EdgeInsets.only(right: 8.0),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12.0, vertical: 0),
-                        decoration: BoxDecoration(
-                          color: suggestionBgColor,
-                          border: Border.all(
-                            color: suggestionBorderColor,
-                            width: 1.0,
+      body: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 130),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_errorMessage != null)
+                        StatusMessage(
+                          message: _errorMessage!,
+                          type: MessageType.error,
+                          onDismiss: () => setState(() => _errorMessage = null),
+                        ),
+                      if (_actionMessage != null)
+                        StatusMessage(
+                          message: _actionMessage!,
+                          type: MessageType.acknowledgement,
+                        ),
+                      if (_weatherData != null)
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: WeatherDisplay(
+                            weatherData: _weatherData!,
+                            onClose: _clearResults,
                           ),
-                          borderRadius: BorderRadius.circular(12.0),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_suggestions[index].icon != null)
-                              Icon(
-                                _suggestions[index].icon,
-                                color: suggestionTextColor,
-                                size: 16,
-                              ),
-                            SizedBox(
-                                width:
-                                    _suggestions[index].icon != null ? 6.0 : 0),
-                            Text(
-                              _suggestions[index].displayText,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                    color: suggestionTextColor,
-                                    fontSize: 14,
-                                    fontFamily: 'Inter',
-                                  ) ??
-                                  TextStyle(
-                                    color: suggestionTextColor,
-                                    fontSize: 14,
-                                    fontFamily: 'Inter',
-                                  ),
+                      if (_webResults != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: textFieldBgColor.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
+                            margin: const EdgeInsets.only(bottom: 16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'Summary',
+                                            style: TextStyle(
+                                              color: textColor,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          Row(
+                                            children: [
+                                              // Copy button
+                                              GestureDetector(
+                                                onTap: () {
+                                                  final summaryText =
+                                                      _webResults!
+                                                          .first.description;
+                                                  Clipboard.setData(
+                                                      ClipboardData(
+                                                          text: summaryText));
 
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: textFieldBgColor,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18.0,
-                  vertical: 6.0,
-                ),
-                margin: const EdgeInsets.only(bottom: 8.0),
-                child: Theme(
-                  data: theme,
-                  child: TextField(
-                    focusNode: _focusNode,
-                    cursorColor: textColor,
-                    controller: _controller,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 16,
-                      fontFamily: 'Inter',
-                    ),
-                    decoration: InputDecoration(
-                      hintText: "Start with @ to do stuff",
-                      fillColor: textFieldBgColor,
-                      filled: true,
-                      hintStyle: TextStyle(
-                        color: hintColor,
-                        fontFamily: 'Inter',
-                        fontSize: 16,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding:
-                          const EdgeInsets.symmetric(vertical: 12.0),
-                    ),
-                    onSubmitted: _handleSubmitted,
+                                                  setState(() {
+                                                    _actionMessage =
+                                                        'Summary copied to clipboard';
+                                                  });
+
+                                                  // Auto-dismiss the message after 2 seconds
+                                                  Future.delayed(
+                                                      const Duration(
+                                                          seconds: 2), () {
+                                                    if (mounted) {
+                                                      setState(() {
+                                                        _actionMessage = null;
+                                                      });
+                                                    }
+                                                  });
+                                                },
+                                                child: Container(
+                                                  width: 28,
+                                                  height: 28,
+                                                  margin: const EdgeInsets.only(
+                                                      right: 8),
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: textFieldBgColor,
+                                                  ),
+                                                  child: Center(
+                                                    child: Icon(
+                                                      Icons.copy,
+                                                      size: 16,
+                                                      color: textColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+
+                                              // Close button
+                                              GestureDetector(
+                                                onTap: () {
+                                                  setState(() {
+                                                    _webResults = null;
+                                                  });
+                                                },
+                                                child: Container(
+                                                  width: 28,
+                                                  height: 28,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: textFieldBgColor,
+                                                  ),
+                                                  child: Center(
+                                                    child: Icon(
+                                                      Icons.close,
+                                                      size: 16,
+                                                      color: textColor,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _webResults!.first.description,
+                                        style: TextStyle(
+                                          color: textColor.withOpacity(0.9),
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      top: BorderSide(
+                                          color: textFieldBgColor, width: 1),
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        'Sources',
+                                        style: TextStyle(
+                                          color: textColor,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ..._webResults!
+                                          .map(
+                                            (result) => Padding(
+                                              padding: const EdgeInsets.only(
+                                                  right: 8.0),
+                                              child: InkWell(
+                                                onTap: () =>
+                                                    result.url.isNotEmpty
+                                                        ? _performWebSearch(
+                                                            result.url)
+                                                        : null,
+                                                child: CircleAvatar(
+                                                  radius: 12,
+                                                  backgroundColor:
+                                                      textFieldBgColor,
+                                                  child: Icon(
+                                                    Icons.public,
+                                                    size: 16,
+                                                    color: textColor,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      const Spacer(),
+                                      InkWell(
+                                        onTap: () async {
+                                          final query =
+                                              _webResults!.first.title;
+                                          final content =
+                                              _webResults!.first.description;
+
+                                          setState(() {
+                                            _actionMessage =
+                                                'Saving to Notes...';
+                                          });
+
+                                          final success =
+                                              await ActionUtils.createNote(
+                                                  "Note: $query", content);
+
+                                          if (success) {
+                                            setState(() {
+                                              _actionMessage =
+                                                  'Saved summary to Notes';
+                                            });
+                                            Future.delayed(
+                                                const Duration(seconds: 1), () {
+                                              if (mounted) {
+                                                setState(() {
+                                                  _actionMessage = null;
+                                                });
+                                              }
+                                            });
+                                          } else {
+                                            _showError(
+                                                'Could not create note. Notes app not available.');
+                                          }
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: textFieldBgColor,
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.note_add,
+                                                size: 16,
+                                                color: textColor,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Save to Notes',
+                                                style: TextStyle(
+                                                  color: textColor,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (_showDetailedResults)
+                                  ..._webResults!
+                                      .map((result) => Container(
+                                            decoration: BoxDecoration(
+                                              border: Border(
+                                                top: BorderSide(
+                                                    color: textFieldBgColor,
+                                                    width: 1),
+                                              ),
+                                            ),
+                                            child: ListTile(
+                                              contentPadding:
+                                                  const EdgeInsets.all(16.0),
+                                              title: Text(
+                                                result.title,
+                                                style: TextStyle(
+                                                  color: textColor,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              subtitle: Padding(
+                                                padding: const EdgeInsets.only(
+                                                    top: 8.0),
+                                                child: Text(
+                                                  result.description,
+                                                  style: TextStyle(
+                                                    color: textColor
+                                                        .withOpacity(0.7),
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                              onTap: () => result.url.isNotEmpty
+                                                  ? _performWebSearch(
+                                                      result.url)
+                                                  : null,
+                                            ),
+                                          ))
+                                      .toList(),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
+            ],
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: backgroundColor,
+              ),
+              child: SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Suggestions
+                    Container(
+                      height: 40,
+                      margin: const EdgeInsets.fromLTRB(8.0, 8.0, 0, 10.0),
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _suggestions.length,
+                        itemBuilder: (context, index) {
+                          return GestureDetector(
+                            onTap: () => _applyHighlightedSuggestion(
+                                _suggestions[index]),
+                            child: Container(
+                              height: 40,
+                              margin: const EdgeInsets.only(right: 8.0),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12.0, vertical: 0),
+                              decoration: BoxDecoration(
+                                color: suggestionBgColor,
+                                border: Border.all(
+                                  color: suggestionBorderColor,
+                                  width: 1.0,
+                                ),
+                                borderRadius: BorderRadius.circular(12.0),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_suggestions[index].icon != null)
+                                    Icon(
+                                      _suggestions[index].icon,
+                                      color: suggestionTextColor,
+                                      size: 16,
+                                    ),
+                                  SizedBox(
+                                      width: _suggestions[index].icon != null
+                                          ? 6.0
+                                          : 0),
+                                  Text(
+                                    _suggestions[index].displayText,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                          color: suggestionTextColor,
+                                          fontSize: 14,
+                                          fontFamily: 'Inter',
+                                        ) ??
+                                        TextStyle(
+                                          color: suggestionTextColor,
+                                          fontSize: 14,
+                                          fontFamily: 'Inter',
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Text Field
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8.0, 0, 8.0, 8.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: textFieldBgColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18.0,
+                          vertical: 6.0,
+                        ),
+                        child: Theme(
+                          data: theme,
+                          child: TextField(
+                            focusNode: _focusNode,
+                            cursorColor: textColor,
+                            controller: _controller,
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 16,
+                              fontFamily: 'Inter',
+                            ),
+                            decoration: InputDecoration(
+                              hintText:
+                                  "Start with @ to do stuff or ? for help",
+                              fillColor: textFieldBgColor,
+                              filled: true,
+                              hintStyle: TextStyle(
+                                color: hintColor,
+                                fontFamily: 'Inter',
+                                fontSize: 16,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 12.0),
+                            ),
+                            onSubmitted: _handleSubmitted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
