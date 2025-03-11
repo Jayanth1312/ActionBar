@@ -22,6 +22,7 @@ ActionBar is a versatile Flutter application that provides quick access to vario
 - **Notes**: `@n [title]` to create a new note
 - **Alarms**: `@a [hour] [minute] [am/pm]` to set alarms (e.g., `@a 8 30 am` or `@a 17 45`)
 - **Timers**: `@t [time]` to set timers (e.g., `@t 5min` or `@t 1hr 30min`)
+- **Web results**: `@w [query]` to scrape the top 3 websites and give the data to the gemini model for summarized data presentation (e.g., `@w what is an android intent`)
 
 ### User Interface
 - Clean, modern interface with dark mode support
@@ -74,3 +75,4 @@ ActionBar is a versatile Flutter application that provides quick access to vario
 - Voice command support
 - Customizable themes and layouts
 - Widget support for quick access from home screen
+- Importantly text based suggestion filtering, meaning when i started typing a number it automatically filters the suggestions and shows only alarm and timer, for faster actions
