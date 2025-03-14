@@ -2,8 +2,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
 import 'dart:io';
+import 'package:flutter/services.dart';
 
 class ActionUtils {
+  static const MethodChannel _lensChannel =
+      MethodChannel('com.example.actionbar/lens');
+
   //Note
   static Future<bool> createNote(String title, String content) async {
     try {
@@ -12,11 +16,9 @@ class ActionUtils {
           final AndroidIntent intent = AndroidIntent(
             action: 'android.intent.action.MAIN',
             package: 'com.oneplus.note',
-            componentName:
-                'com.oneplus.note.ui.NoteEditActivity',
+            componentName: 'com.oneplus.note.ui.NoteEditActivity',
             arguments: <String, dynamic>{
-              'android.intent.extra.SUBJECT':
-                  title,
+              'android.intent.extra.SUBJECT': title,
               'android.intent.extra.TEXT': content,
             },
             flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
@@ -128,5 +130,86 @@ class ActionUtils {
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
+  }
+
+  static Future<bool> openGoogleLens() async {
+    try {
+      if (Platform.isAndroid) {
+        try {
+          // Try to use the method channel first (most reliable approach)
+          final result = await _lensChannel.invokeMethod('openGoogleLens');
+          return result == true;
+        } catch (e) {
+          print('Method channel error: $e');
+
+          // If method channel fails, try direct AndroidIntent approach
+          try {
+            final AndroidIntent intent = AndroidIntent(
+              action: 'android.intent.action.VIEW',
+              package: 'com.google.ar.lens',
+              componentName:
+                  'com.google.vr.apps.ornament.app.lens.LensLauncherActivity',
+              flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
+            );
+            await intent.launch();
+            return true;
+          } catch (e) {
+            print('Error opening Google Lens directly: $e');
+          }
+
+          // Try Google app with lens component
+          try {
+            final intent = AndroidIntent(
+              action: 'android.intent.action.VIEW',
+              package: 'com.google.android.googlequicksearchbox',
+              componentName: 'com.google.android.apps.search.lens.LensActivity',
+            );
+            await intent.launch();
+            return true;
+          } catch (e) {
+            print('Error opening Google Lens via Google app component: $e');
+          }
+
+          // Try with lens URI
+          try {
+            final intent = AndroidIntent(
+              action: 'android.intent.action.VIEW',
+              data: 'googleapp://lens',
+            );
+            await intent.launch();
+            return true;
+          } catch (e) {
+            print('Error opening Google Lens via URI: $e');
+          }
+
+          // If all else fails, open camera
+          try {
+            final intent = AndroidIntent(
+              action: 'android.media.action.STILL_IMAGE_CAMERA',
+            );
+            await intent.launch();
+            return true;
+          } catch (e) {
+            print('Error opening camera as fallback: $e');
+          }
+        }
+      }
+
+      // For iOS or if all Android approaches fail, fallback to web
+      return await _openGoogleLensWeb();
+    } catch (e) {
+      print('Error opening Google Lens: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> _openGoogleLensWeb() async {
+    const url = 'https://lens.google.com';
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return true;
+    }
+    return false;
   }
 }

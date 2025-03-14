@@ -10,11 +10,14 @@ import android.provider.AlarmClock
 import android.content.ComponentName
 import android.util.Log
 import android.os.Bundle
+import android.net.Uri
+import android.provider.MediaStore
 
 class MainActivity : FlutterActivity() {
     companion object {
         private const val ALARM_CHANNEL = "com.example.actionbar/alarm"
         private const val TIMER_CHANNEL = "com.example.actionbar/timer"
+        private const val LENS_CHANNEL = "com.example.actionbar/lens"
         private const val TAG = "MainActivity"
     }
 
@@ -82,6 +85,25 @@ class MainActivity : FlutterActivity() {
                         } catch (e: Exception) {
                             Log.e(TAG, "Error in showAndroidTimers: ${e.message}")
                             result.error("TIMER_ERROR", "Could not show timers", e.message)
+                        }
+                    }
+                    else -> {
+                        result.notImplemented()
+                    }
+                }
+            }
+
+        // Google Lens Method Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LENS_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "openGoogleLens" -> {
+                        try {
+                            val lensResult = openGoogleLens()
+                            result.success(lensResult)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in openGoogleLens: ${e.message}")
+                            result.error("LENS_ERROR", "Could not open Google Lens", e.message)
                         }
                     }
                     else -> {
@@ -198,6 +220,75 @@ class MainActivity : FlutterActivity() {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error showing timers: ${e.message}")
+            false
+        }
+    }
+
+    private fun openGoogleLens(): Boolean {
+        return try {
+            Log.d(TAG, "Attempting to open Google Lens")
+
+            // Try multiple approaches to open Google Lens
+            try {
+                // Approach 1: Try Google Lens directly
+                val intent = Intent().apply {
+                    action = Intent.ACTION_VIEW
+                    component = ComponentName(
+                        "com.google.ar.lens",
+                        "com.google.vr.apps.ornament.app.lens.LensLauncherActivity"
+                    )
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(intent)
+                Log.d(TAG, "Opened Google Lens via direct component")
+                return true
+            } catch (e: Exception) {
+                Log.e(TAG, "Direct component approach failed: ${e.message}")
+
+                // Approach 2: Try Google app's Lens feature
+                try {
+                    val intent = Intent().apply {
+                        action = Intent.ACTION_VIEW
+                        component = ComponentName(
+                            "com.google.android.googlequicksearchbox",
+                            "com.google.android.apps.search.lens.LensActivity"
+                        )
+                    }
+                    startActivity(intent)
+                    Log.d(TAG, "Opened Google Lens via Google app component")
+                    return true
+                } catch (e: Exception) {
+                    Log.e(TAG, "Google app component approach failed: ${e.message}")
+
+                    // Approach 3: Try Google app with lens URI
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("googleapp://lens"))
+                        startActivity(intent)
+                        Log.d(TAG, "Opened Google Lens via URI")
+                        return true
+                    } catch (e: Exception) {
+                        Log.e(TAG, "URI approach failed: ${e.message}")
+
+                        // Approach 4: Try camera with specific action
+                        try {
+                            val intent = Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+                            startActivity(intent)
+                            Log.d(TAG, "Opened camera as fallback")
+                            return true
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Camera fallback failed: ${e.message}")
+                        }
+                    }
+                }
+            }
+
+            // If all approaches failed, try web version
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://lens.google.com"))
+            startActivity(intent)
+            Log.d(TAG, "Opened Google Lens web version")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "All Google Lens approaches failed: ${e.message}")
             false
         }
     }
